@@ -19,6 +19,29 @@
     .modal-panel { animation: modalIn 0.2s ease-out; }
     /* Prevent body scroll when modal open */
     body.modal-open { overflow: hidden; }
+
+    /* Mobile floating drawer (hamburger menu) */
+    @media (max-width: 767px) {
+      #sidebar.mobile-drawer {
+        position: fixed;
+        z-index: 50;
+        top: 3.25rem;
+        bottom: 0.75rem;
+        left: 0.5rem;
+        width: 18rem;
+        border-radius: 1.25rem;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.35);
+        transform: translateX(-110%);
+        opacity: 0;
+        transition: transform 0.18s ease, opacity 0.18s ease;
+        border: 1px solid rgba(55, 65, 81, 0.9); /* border-gray-700-ish */
+        overflow-y: auto;
+      }
+      #sidebar.mobile-drawer.open {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
@@ -49,7 +72,7 @@
   <div class="flex flex-1 overflow-hidden">
 
     <!-- ─── SIDEBAR ─── -->
-    <aside id="sidebar" class="w-56 bg-gray-900 border-r border-gray-800 flex flex-col p-3 gap-1 hidden md:flex flex-shrink-0 overflow-y-auto">
+    <aside id="sidebar" class="mobile-drawer w-56 bg-gray-900 border-r border-gray-800 flex flex-col p-3 gap-1 hidden md:flex flex-shrink-0 overflow-y-auto">
       <!-- Upload button -->
       <button id="uploadBtn"
         class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium transition mb-3 shadow-lg shadow-indigo-900/40">
@@ -808,15 +831,18 @@
   function openMobileMenu() {
     mobileOverlay.classList.remove('hidden');
     sidebar.classList.remove('hidden');
-    sidebar.classList.add('fixed', 'z-50', 'top-0', 'left-0', 'h-full', 'w-72');
+    sidebar.classList.add('open');
+    document.body.classList.add('modal-open');
   }
   function closeMobileMenu() {
     mobileOverlay.classList.add('hidden');
-    sidebar.classList.remove('fixed', 'z-50', 'top-0', 'left-0', 'h-full', 'w-72');
+    sidebar.classList.remove('open');
+    document.body.classList.remove('modal-open');
     if (window.matchMedia('(min-width: 768px)').matches) {
       sidebar.classList.remove('hidden');
     } else {
-      sidebar.classList.add('hidden');
+      // Wait for the slide-out transition, then hide the element.
+      setTimeout(() => sidebar.classList.add('hidden'), 180);
     }
   }
   document.getElementById('hamburgerBtn').addEventListener('click', openMobileMenu);
