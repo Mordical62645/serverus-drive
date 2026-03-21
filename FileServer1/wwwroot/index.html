@@ -148,8 +148,8 @@
           <input type="password" id="encryptKeyInput" placeholder="Encryption password" autocomplete="off"
             class="flex-1 min-w-0 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
         </div>
-        <p id="encryptHint" class="hidden text-xs text-amber-200/80 leading-relaxed">
-          After an encrypted upload, open <strong>DevTools (F12) → Console</strong>. The server response includes <code class="text-gray-400">ivBase64</code> — you must save it with your password to decrypt later (it is not stored in the UI).
+        <p id="encryptHint" class="hidden text-xs text-emerald-200/80 leading-relaxed">
+          The IV is stored inside each <code class="text-gray-400">.enc</code> file. To decrypt later, use the <strong>same password</strong> and the <strong>🔓</strong> button on the file (or <code class="text-gray-400">POST /api/decrypt</code> with <code class="text-gray-400">encryptedFileName</code> + <code class="text-gray-400">key</code> only).
         </p>
       </div>
 
@@ -517,7 +517,7 @@
       <span class="w-14 text-right text-xs text-gray-500 flex-shrink-0">${formatSize(file.size)}</span>`;
 
     const acts = hoverActions(file);
-    acts.className = 'w-20 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0';
+    acts.className = 'w-28 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0';
     row.appendChild(acts);
     row.addEventListener('click', e => { if (!e.target.closest('button')) openPreview(file); });
     return row;
@@ -537,9 +537,14 @@
     const btnData = [
       ['👁️', 'Preview',  () => openPreview(file)],
       ['⬇️', 'Download', () => doDownload(file.name)],
+    ];
+    if (file.name.toLowerCase().endsWith('.enc')) {
+      btnData.push(['🔓', 'Decrypt with password', () => decryptEncFile(file)]);
+    }
+    btnData.push(
       [file.starred ? '⭐' : '☆', file.starred ? 'Unstar' : 'Star', () => toggleStar(file)],
       [currentSection === 'trash' ? '↩️' : '🗑️', currentSection === 'trash' ? 'Restore' : 'Move to trash', () => toggleTrash(file)],
-    ];
+    );
     for (const [icon, title, fn] of btnData) {
       const btn = document.createElement('button');
       btn.className = 'w-6 h-6 rounded-md bg-gray-900/85 backdrop-blur-sm text-xs flex items-center justify-center hover:bg-gray-700 transition border border-gray-700/50';
@@ -592,7 +597,7 @@
         return;
       }
       showToast(`Encrypting ${files.length} file${files.length > 1 ? 's' : ''}…`, 'info');
-      const ivLog = [];
+      let okCount = 0;
       try {
         for (const f of files) {
           const fd = new FormData();
@@ -603,16 +608,10 @@
             showToast(`Encrypt failed (${f.name}): ` + (await res.text()), 'error');
             continue;
           }
-          const data = await res.json();
-          ivLog.push({
-            encryptedFileName: data.encryptedFileName,
-            ivBase64: data.ivBase64,
-            originalName: f.name
-          });
+          okCount++;
         }
-        if (ivLog.length) {
-          console.log('[Serverus] Encrypted uploads — SAVE ivBase64 + password to decrypt later:', ivLog);
-          showToast(`${ivLog.length} encrypted — open F12 Console to copy ivBase64 for each file`, 'success');
+        if (okCount) {
+          showToast(`${okCount} encrypted — decrypt anytime with the same password (🔓 on the file)`, 'success');
         }
         await refreshFiles();
       } catch (err) {
@@ -663,6 +662,33 @@
       await refreshFiles();
     } catch (err) {
       showToast('Trash error: ' + err.message, 'error');
+    }
+  }
+
+  async function decryptEncFile(file) {
+    const key = prompt('Enter the encryption password for:\n' + file.name);
+    if (key === null) return;
+    const trimmed = (key || '').trim();
+    if (!trimmed) {
+      showToast('Password required to decrypt.', 'warning');
+      return;
+    }
+    showToast('Decrypting…', 'info');
+    try {
+      const fd = new FormData();
+      fd.append('encryptedFileName', file.name);
+      fd.append('key', trimmed);
+      const res = await fetch('/api/decrypt', { method: 'POST', body: fd });
+      const text = await res.text();
+      if (!res.ok) {
+        showToast(text || 'Decrypt failed', 'error');
+        return;
+      }
+      const data = JSON.parse(text);
+      showToast('Decrypted: ' + (data.fileName || 'OK'), 'success');
+      await refreshFiles();
+    } catch (err) {
+      showToast('Decrypt error: ' + err.message, 'error');
     }
   }
 

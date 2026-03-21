@@ -9,7 +9,7 @@ Serverus is a self-hosted cloud system where a user connects to their home netwo
 - Download files to the browser’s default save dialog
 - Star/unstar files (persisted)
 - Soft delete to Trash (persisted), restore, and permanent delete from Trash
-- Optional encryption endpoint for uploaded files (AES-CBC) and `ivBase64` response for later decryption
+- Optional encryption for uploads (AES-CBC): `.enc` files store the IV in-file; decrypt with the **same password** only (no need to save `ivBase64` for new files)
 
 ## Tech Stack
 
@@ -98,20 +98,21 @@ Serverus is a self-hosted cloud system where a user connects to their home netwo
   - `multipart/form-data`
   - fields: `file` and `key` (string)
   - stores encrypted output as `<original>.enc`
+  - **File format:** first **16 bytes** = AES IV, remainder = ciphertext (password-only decrypt supported)
   - returns:
     - `encryptedFileName`
-    - `ivBase64` (required to decrypt)
+    - `ivBase64` (optional echo of the IV; not required for decrypt)
+    - `format`: `iv-prefixed`
     - `algorithm` (currently `AES-CBC-PKCS7`)
 
 ### Decryption (matches `/api/encrypt`)
 
-The `.enc` file on disk is **only ciphertext** — the **IV is not inside the file**. You must keep the **`ivBase64`** string returned when you encrypted (and the same `key`).
-
 - `POST /api/decrypt`
   - `multipart/form-data`
-  - required: `key`, `ivBase64`
+  - required: **`key`** (same password as encrypt)
+  - optional: **`ivBase64`** — only for **legacy** `.enc` files created before IV-in-file (whole file was ciphertext)
   - plus **one** of:
-    - `encryptedFileName` — name of a `.enc` file already in `storage/` (e.g. from the encrypt response), or
+    - `encryptedFileName` — name of a `.enc` in `storage/` **or** in `storage/.trash/`, or
     - `file` — upload the `.enc` file
   - writes a decrypted file into `storage/` (name = original name with `.enc` removed; may get a unique suffix if that name exists)
   - returns: `{ "fileName": "...", "algorithm": "AES-CBC-PKCS7" }`

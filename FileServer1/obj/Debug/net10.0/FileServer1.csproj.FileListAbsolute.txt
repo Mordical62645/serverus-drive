@@ -1,7 +1,6 @@
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\appsettings.Development.json
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\appsettings.json
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.staticwebassets.endpoints.json
-C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.exe
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.deps.json
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.runtimeconfig.json
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.dll
@@ -29,4 +28,5 @@ C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.staticwebassets.runtime.json
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\storage\.meta.json
 C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\obj\Debug\net10.0\FileServer1.sourcelink.json
-C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\obj\Debug\net10.0\compressed\tmhm5424rp-{0}-aburwc8q6w-aburwc8q6w.gz
+C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\obj\Debug\net10.0\compressed\tmhm5424rp-{0}-eu068jycl2-eu068jycl2.gz
+C:\Users\Marco Antonio\Documents\SCHOOL\4TH YEAR\2ND_SEMESTER\ITELEC2\ACTIVITIES\MARCH\03-19-2026\FinalProject\FileServer\FileServer1\bin\Debug\net10.0\FileServer1.exe

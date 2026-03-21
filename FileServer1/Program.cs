@@ -335,7 +335,8 @@ app.MapDelete("/api/trash/{fileName}", async (string fileName) =>
 });
 
 // Encrypts an uploaded file and stores it as `<original>.enc` in the `storage` folder.
-// Response includes `ivBase64` required for decryption, plus the `encryptedFileName` to download later.
+// File format: first 16 bytes = AES IV, remainder = ciphertext (so decrypt only needs the same password).
+// `ivBase64` in the JSON response is optional metadata only (not required for decrypt anymore).
 app.MapPost("/api/encrypt", async ([FromForm] IFormFile file, [FromForm] string key) =>
 {
     if (file is null || file.Length == 0)
@@ -364,10 +365,11 @@ app.MapPost("/api/encrypt", async ([FromForm] IFormFile file, [FromForm] string 
     byte[] iv = aes.IV;
 
     await using var output = File.Create(encryptedPath);
-    using var input = file.OpenReadStream();
+    await output.WriteAsync(iv);
 
+    using var input = file.OpenReadStream();
     using var encryptor = aes.CreateEncryptor();
-    using var cryptoStream = new CryptoStream(output, encryptor, CryptoStreamMode.Write);
+    using var cryptoStream = new CryptoStream(output, encryptor, CryptoStreamMode.Write, leaveOpen: true);
 
     await input.CopyToAsync(cryptoStream);
     cryptoStream.FlushFinalBlock();
@@ -390,18 +392,18 @@ app.MapPost("/api/encrypt", async ([FromForm] IFormFile file, [FromForm] string 
     {
         encryptedFileName = encryptedName,
         ivBase64 = Convert.ToBase64String(iv),
+        format = "iv-prefixed",
         algorithm = "AES-CBC-PKCS7"
     });
 }).DisableAntiforgery();
 
-// Decrypts a `.enc` file using the same key + IV that `/api/encrypt` used.
-// You must send the exact `ivBase64` returned when you encrypted (it is not stored inside the .enc file).
-app.MapPost("/api/decrypt", async ([FromForm] IFormFile? file, [FromForm] string? encryptedFileName, [FromForm] string key, [FromForm] string ivBase64) =>
+// Decrypts a `.enc` file with the same password used for encryption.
+// Default: reads the IV from the first 16 bytes of the file (new format from /api/encrypt).
+// Legacy: if you pass `ivBase64`, the entire file body is treated as ciphertext (old uploads).
+app.MapPost("/api/decrypt", async ([FromForm] IFormFile? file, [FromForm] string? encryptedFileName, [FromForm] string key, [FromForm] string? ivBase64) =>
 {
     if (string.IsNullOrWhiteSpace(key))
         return Results.BadRequest("Missing key.");
-    if (string.IsNullOrWhiteSpace(ivBase64))
-        return Results.BadRequest("Missing ivBase64 (use the value returned from /api/encrypt).");
 
     Stream cipherStream;
     string sourceName;
@@ -418,7 +420,12 @@ app.MapPost("/api/decrypt", async ([FromForm] IFormFile? file, [FromForm] string
             return Results.BadRequest("Invalid encryptedFileName.");
         var path = Path.Combine(storagePath, safe);
         if (!File.Exists(path))
-            return Results.NotFound();
+        {
+            path = Path.Combine(trashPath, safe);
+            if (!File.Exists(path))
+                return Results.NotFound();
+        }
+
         cipherStream = File.OpenRead(path);
         sourceName = safe;
     }
@@ -433,20 +440,40 @@ app.MapPost("/api/decrypt", async ([FromForm] IFormFile? file, [FromForm] string
 
     byte[] keyBytes = SHA256.HashData(Encoding.UTF8.GetBytes(key));
     byte[] iv;
-    try
-    {
-        iv = Convert.FromBase64String(ivBase64);
-    }
-    catch
-    {
-        await cipherStream.DisposeAsync();
-        return Results.BadRequest("Invalid ivBase64.");
-    }
 
-    if (iv.Length != 16)
+    if (!string.IsNullOrWhiteSpace(ivBase64))
     {
-        await cipherStream.DisposeAsync();
-        return Results.BadRequest("IV must decode to 16 bytes for AES-CBC.");
+        try
+        {
+            iv = Convert.FromBase64String(ivBase64);
+        }
+        catch
+        {
+            await cipherStream.DisposeAsync();
+            return Results.BadRequest("Invalid ivBase64.");
+        }
+
+        if (iv.Length != 16)
+        {
+            await cipherStream.DisposeAsync();
+            return Results.BadRequest("IV must decode to 16 bytes for AES-CBC.");
+        }
+    }
+    else
+    {
+        iv = new byte[16];
+        var pos = 0;
+        while (pos < 16)
+        {
+            var read = await cipherStream.ReadAsync(iv.AsMemory(pos, 16 - pos));
+            if (read == 0)
+            {
+                await cipherStream.DisposeAsync();
+                return Results.BadRequest("File too short to contain an IV.");
+            }
+
+            pos += read;
+        }
     }
 
     using var aes = Aes.Create();
@@ -470,7 +497,11 @@ app.MapPost("/api/decrypt", async ([FromForm] IFormFile? file, [FromForm] string
     {
         if (File.Exists(outPath))
             try { File.Delete(outPath); } catch { /* ignore */ }
-        return Results.BadRequest("Decryption failed: wrong key, wrong IV, or corrupted ciphertext.");
+
+        var hint = string.IsNullOrWhiteSpace(ivBase64)
+            ? " Wrong password, corrupted file, or this is an old .enc (encrypt before IV-in-file) — try again with form field ivBase64 set."
+            : " Wrong password, wrong IV, or corrupted file.";
+        return Results.BadRequest("Decryption failed." + hint);
     }
 
     var savedName = Path.GetFileName(outPath);
