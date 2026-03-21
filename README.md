@@ -103,6 +103,19 @@ Serverus is a self-hosted cloud system where a user connects to their home netwo
     - `ivBase64` (required to decrypt)
     - `algorithm` (currently `AES-CBC-PKCS7`)
 
+### Decryption (matches `/api/encrypt`)
+
+The `.enc` file on disk is **only ciphertext** — the **IV is not inside the file**. You must keep the **`ivBase64`** string returned when you encrypted (and the same `key`).
+
+- `POST /api/decrypt`
+  - `multipart/form-data`
+  - required: `key`, `ivBase64`
+  - plus **one** of:
+    - `encryptedFileName` — name of a `.enc` file already in `storage/` (e.g. from the encrypt response), or
+    - `file` — upload the `.enc` file
+  - writes a decrypted file into `storage/` (name = original name with `.enc` removed; may get a unique suffix if that name exists)
+  - returns: `{ "fileName": "...", "algorithm": "AES-CBC-PKCS7" }`
+
 ## Notes / Current Limitations
 
 - The UI and endpoints are designed for a school/demo environment.

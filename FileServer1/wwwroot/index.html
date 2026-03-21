@@ -138,6 +138,21 @@
         </div>
       </div>
 
+      <!-- Optional: encrypt on upload (uses /api/encrypt — not the plain upload) -->
+      <div class="mb-5 rounded-xl border border-gray-800 bg-gray-900/40 px-4 py-3 flex flex-col gap-3">
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer select-none">
+          <input type="checkbox" id="encryptOnUpload" class="rounded border-gray-600 bg-gray-900 text-indigo-500 focus:ring-indigo-500" />
+          <span><strong class="text-indigo-300">Encrypt</strong> uploads with a password (saves <code class="text-xs text-gray-500">.enc</code> files)</span>
+        </label>
+        <div id="encryptKeyRow" class="hidden flex flex-col sm:flex-row gap-2 sm:items-center">
+          <input type="password" id="encryptKeyInput" placeholder="Encryption password" autocomplete="off"
+            class="flex-1 min-w-0 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <p id="encryptHint" class="hidden text-xs text-amber-200/80 leading-relaxed">
+          After an encrypted upload, open <strong>DevTools (F12) → Console</strong>. The server response includes <code class="text-gray-400">ivBase64</code> — you must save it with your password to decrypt later (it is not stored in the UI).
+        </p>
+      </div>
+
       <!-- Type filter pills + sorting -->
       <div class="flex flex-col gap-3 mb-4">
         <div id="filterPills" class="flex gap-2 overflow-x-auto pb-1"></div>
@@ -567,6 +582,45 @@
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
+
+    const encrypt = document.getElementById('encryptOnUpload').checked;
+    const key = (document.getElementById('encryptKeyInput').value || '').trim();
+
+    if (encrypt) {
+      if (!key) {
+        showToast('Turn off Encrypt or enter a password.', 'warning');
+        return;
+      }
+      showToast(`Encrypting ${files.length} file${files.length > 1 ? 's' : ''}…`, 'info');
+      const ivLog = [];
+      try {
+        for (const f of files) {
+          const fd = new FormData();
+          fd.append('file', f);
+          fd.append('key', key);
+          const res = await fetch('/api/encrypt', { method: 'POST', body: fd });
+          if (!res.ok) {
+            showToast(`Encrypt failed (${f.name}): ` + (await res.text()), 'error');
+            continue;
+          }
+          const data = await res.json();
+          ivLog.push({
+            encryptedFileName: data.encryptedFileName,
+            ivBase64: data.ivBase64,
+            originalName: f.name
+          });
+        }
+        if (ivLog.length) {
+          console.log('[Serverus] Encrypted uploads — SAVE ivBase64 + password to decrypt later:', ivLog);
+          showToast(`${ivLog.length} encrypted — open F12 Console to copy ivBase64 for each file`, 'success');
+        }
+        await refreshFiles();
+      } catch (err) {
+        showToast('Encrypt error: ' + err.message, 'error');
+      }
+      return;
+    }
+
     showToast(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}…`, 'info');
     const fd = new FormData();
     for (const f of files) fd.append('files', f);
@@ -792,6 +846,12 @@
   });
 
   document.getElementById('uploadBtn').addEventListener('click', () => fileInput.click());
+
+  document.getElementById('encryptOnUpload').addEventListener('change', e => {
+    const on = e.target.checked;
+    document.getElementById('encryptKeyRow').classList.toggle('hidden', !on);
+    document.getElementById('encryptHint').classList.toggle('hidden', !on);
+  });
 
   document.getElementById('sortSelect').addEventListener('change', e => {
     sortMode = e.target.value;

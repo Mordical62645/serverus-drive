@@ -394,6 +394,106 @@ app.MapPost("/api/encrypt", async ([FromForm] IFormFile file, [FromForm] string 
     });
 }).DisableAntiforgery();
 
+// Decrypts a `.enc` file using the same key + IV that `/api/encrypt` used.
+// You must send the exact `ivBase64` returned when you encrypted (it is not stored inside the .enc file).
+app.MapPost("/api/decrypt", async ([FromForm] IFormFile? file, [FromForm] string? encryptedFileName, [FromForm] string key, [FromForm] string ivBase64) =>
+{
+    if (string.IsNullOrWhiteSpace(key))
+        return Results.BadRequest("Missing key.");
+    if (string.IsNullOrWhiteSpace(ivBase64))
+        return Results.BadRequest("Missing ivBase64 (use the value returned from /api/encrypt).");
+
+    Stream cipherStream;
+    string sourceName;
+
+    if (file is not null && file.Length > 0)
+    {
+        cipherStream = file.OpenReadStream();
+        sourceName = SanitizeFileName(file.FileName);
+    }
+    else if (!string.IsNullOrWhiteSpace(encryptedFileName))
+    {
+        var safe = SanitizeFileName(encryptedFileName);
+        if (string.IsNullOrWhiteSpace(safe))
+            return Results.BadRequest("Invalid encryptedFileName.");
+        var path = Path.Combine(storagePath, safe);
+        if (!File.Exists(path))
+            return Results.NotFound();
+        cipherStream = File.OpenRead(path);
+        sourceName = safe;
+    }
+    else
+        return Results.BadRequest("Provide either form field `file` (upload .enc) or `encryptedFileName` (name in storage).");
+
+    if (!sourceName.EndsWith(".enc", StringComparison.OrdinalIgnoreCase))
+    {
+        await cipherStream.DisposeAsync();
+        return Results.BadRequest("Expected a .enc ciphertext file.");
+    }
+
+    byte[] keyBytes = SHA256.HashData(Encoding.UTF8.GetBytes(key));
+    byte[] iv;
+    try
+    {
+        iv = Convert.FromBase64String(ivBase64);
+    }
+    catch
+    {
+        await cipherStream.DisposeAsync();
+        return Results.BadRequest("Invalid ivBase64.");
+    }
+
+    if (iv.Length != 16)
+    {
+        await cipherStream.DisposeAsync();
+        return Results.BadRequest("IV must decode to 16 bytes for AES-CBC.");
+    }
+
+    using var aes = Aes.Create();
+    aes.KeySize = 256;
+    aes.Mode = CipherMode.CBC;
+    aes.Padding = PaddingMode.PKCS7;
+    aes.Key = keyBytes;
+    aes.IV = iv;
+
+    var plainBaseName = sourceName[..^4]; // strip ".enc"
+    var outPath = GetUniquePath(storagePath, plainBaseName);
+
+    try
+    {
+        using var decryptor = aes.CreateDecryptor();
+        await using var cryptoIn = new CryptoStream(cipherStream, decryptor, CryptoStreamMode.Read, leaveOpen: false);
+        await using var output = File.Create(outPath);
+        await cryptoIn.CopyToAsync(output);
+    }
+    catch (CryptographicException)
+    {
+        if (File.Exists(outPath))
+            try { File.Delete(outPath); } catch { /* ignore */ }
+        return Results.BadRequest("Decryption failed: wrong key, wrong IV, or corrupted ciphertext.");
+    }
+
+    var savedName = Path.GetFileName(outPath);
+
+    await MetaStore.Lock.WaitAsync();
+    try
+    {
+        var meta = await MetaStore.LoadAsync(metaPath);
+        meta[savedName] = new MetaStore.FileMeta(DateTime.UtcNow.ToString("o"), Starred: false, Trashed: false, TrashedUtc: null);
+        await MetaStore.SaveAsync(metaPath, meta);
+    }
+    finally
+    {
+        MetaStore.Lock.Release();
+    }
+
+    return Results.Ok(new
+    {
+        fileName = savedName,
+        algorithm = "AES-CBC-PKCS7"
+    });
+}).DisableAntiforgery();
+
 app.Run();
 
 static class MetaStore
