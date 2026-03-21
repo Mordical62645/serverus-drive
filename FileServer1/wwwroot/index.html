@@ -517,7 +517,7 @@
       <span class="w-14 text-right text-xs text-gray-500 flex-shrink-0">${formatSize(file.size)}</span>`;
 
     const acts = hoverActions(file);
-    acts.className = 'w-28 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0';
+    acts.className = 'w-44 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0';
     row.appendChild(acts);
     row.addEventListener('click', e => { if (!e.target.closest('button')) openPreview(file); });
     return row;
@@ -543,8 +543,18 @@
     }
     btnData.push(
       [file.starred ? '⭐' : '☆', file.starred ? 'Unstar' : 'Star', () => toggleStar(file)],
-      [currentSection === 'trash' ? '↩️' : '🗑️', currentSection === 'trash' ? 'Restore' : 'Move to trash', () => toggleTrash(file)],
     );
+
+    if (currentSection === 'trash') {
+      btnData.push(
+        ['↩️', 'Restore', () => toggleTrash(file)],
+        ['🗑️', 'Delete permanently', () => permanentDelete(file)],
+      );
+    } else {
+      btnData.push(
+        ['🗑️', 'Move to trash', () => toggleTrash(file)],
+      );
+    }
     for (const [icon, title, fn] of btnData) {
       const btn = document.createElement('button');
       btn.className = 'w-6 h-6 rounded-md bg-gray-900/85 backdrop-blur-sm text-xs flex items-center justify-center hover:bg-gray-700 transition border border-gray-700/50';
@@ -662,6 +672,20 @@
       await refreshFiles();
     } catch (err) {
       showToast('Trash error: ' + err.message, 'error');
+    }
+  }
+
+  async function permanentDelete(file) {
+    const ok = confirm(`Permanently delete:\n${file.name}\n\nThis cannot be undone.`);
+    if (!ok) return;
+
+    try {
+      const res = await fetch('/api/trash/' + encodeURIComponent(file.name), { method: 'DELETE' });
+      if (!res.ok) { showToast('Delete failed: ' + (await res.text()), 'error'); return; }
+      showToast('Deleted permanently', 'success');
+      await refreshFiles();
+    } catch (err) {
+      showToast('Delete error: ' + err.message, 'error');
     }
   }
 

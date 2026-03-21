@@ -123,7 +123,7 @@ app.MapGet("/api/download/{fileName}", (string fileName) =>
         return Results.NotFound();
 
     return Results.File(path, "application/octet-stream", safeName);
-});
+}).DisableAntiforgery();
 
 // ── Serve file inline with correct MIME type (for in-browser preview) ──────────
 app.MapGet("/api/preview/{fileName}", (string fileName) =>
@@ -332,7 +332,7 @@ app.MapDelete("/api/trash/{fileName}", async (string fileName) =>
     }
 
     return Results.NoContent();
-});
+}).DisableAntiforgery();
 
 // Encrypts an uploaded file and stores it as `<original>.enc` in the `storage` folder.
 // File format: first 16 bytes = AES IV, remainder = ciphertext (so decrypt only needs the same password).
