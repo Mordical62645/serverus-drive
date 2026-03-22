@@ -1,1 +1,16 @@
 FileServer1/storage
+
+# .NET Build Output
+bin/
+obj/
+
+# User-specific files
+.vs/
+.meta.json
+
+# Local storage
+storage/
+.trash/
+
+# Secrets
+appsettings.Development.json
